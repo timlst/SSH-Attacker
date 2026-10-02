@@ -19,6 +19,7 @@ public class MitmCommandConfig extends SshDelegateConfig {
     @ParametersDelegate private final TimeoutDelegate timeoutDelegate;
     @ParametersDelegate private final WorkflowInputDelegate workflowInputDelegate;
     @ParametersDelegate private final WorkflowOutputDelegate workflowOutputDelegate;
+    @ParametersDelegate private final KeylogFileDelegate keylogFileDelegate;
     @ParametersDelegate private final WorkflowTypeDelegate workflowTypeDelegate;
     @ParametersDelegate private final MitmDelegate mitmDelegate;
 
@@ -28,12 +29,14 @@ public class MitmCommandConfig extends SshDelegateConfig {
         timeoutDelegate = new TimeoutDelegate();
         workflowInputDelegate = new WorkflowInputDelegate();
         workflowOutputDelegate = new WorkflowOutputDelegate();
+        keylogFileDelegate = new KeylogFileDelegate();
         workflowTypeDelegate = new WorkflowTypeDelegate();
         mitmDelegate = new MitmDelegate();
         addDelegate(configOutputDelegate);
         addDelegate(timeoutDelegate);
         addDelegate(workflowInputDelegate);
         addDelegate(workflowOutputDelegate);
+        addDelegate(keylogFileDelegate);
         addDelegate(workflowTypeDelegate);
         addDelegate(mitmDelegate);
     }

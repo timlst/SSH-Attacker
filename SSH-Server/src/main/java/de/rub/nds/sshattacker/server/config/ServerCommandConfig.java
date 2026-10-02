@@ -20,6 +20,7 @@ public class ServerCommandConfig extends SshDelegateConfig {
     @ParametersDelegate private final TimeoutDelegate timeoutDelegate;
     @ParametersDelegate private final WorkflowInputDelegate workflowInputDelegate;
     @ParametersDelegate private final WorkflowOutputDelegate workflowOutputDelegate;
+    @ParametersDelegate private final KeylogFileDelegate keylogFileDelegate;
     @ParametersDelegate private final WorkflowTypeDelegate workflowTypeDelegate;
 
     public ServerCommandConfig(GeneralDelegate delegate) {
@@ -29,12 +30,14 @@ public class ServerCommandConfig extends SshDelegateConfig {
         timeoutDelegate = new TimeoutDelegate();
         workflowInputDelegate = new WorkflowInputDelegate();
         workflowOutputDelegate = new WorkflowOutputDelegate();
+        keylogFileDelegate = new KeylogFileDelegate();
         workflowTypeDelegate = new WorkflowTypeDelegate();
         addDelegate(serverDelegate);
         addDelegate(configOutputDelegate);
         addDelegate(timeoutDelegate);
         addDelegate(workflowInputDelegate);
         addDelegate(workflowOutputDelegate);
+        addDelegate(keylogFileDelegate);
         addDelegate(workflowTypeDelegate);
     }
 

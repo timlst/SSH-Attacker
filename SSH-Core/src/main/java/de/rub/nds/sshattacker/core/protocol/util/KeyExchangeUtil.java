@@ -25,6 +25,7 @@ import de.rub.nds.sshattacker.core.packet.cipher.keys.KeySetGenerator;
 import de.rub.nds.sshattacker.core.protocol.transport.message.ExchangeHashSignatureMessage;
 import de.rub.nds.sshattacker.core.protocol.transport.message.HostKeyMessage;
 import de.rub.nds.sshattacker.core.state.SshContext;
+import de.rub.nds.sshattacker.core.util.KeylogFile;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -286,5 +287,6 @@ public final class KeyExchangeUtil {
     public static void generateKeySet(SshContext context) {
         KeySet keySet = KeySetGenerator.generateKeySet(context);
         context.setKeySet(keySet);
+        KeylogFile.writeKeylog(context);
     }
 }
