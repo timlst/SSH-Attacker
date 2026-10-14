@@ -233,7 +233,8 @@ public class KeyExchangeInitMessageHandler extends SshMessageHandler<KeyExchange
         }
         if (guessedKex.equals(preferredKex)
                 && guessedHostKeyAlgorithm.equals(preferredHostKeyAlgorithm)) {
-            // TODO: correctly model whether "the other algorithms cannot be agreed upon", but that requires AlgorithmPicker
+            // TODO: correctly model whether "the other algorithms cannot be agreed upon", but that
+            // requires AlgorithmPicker
             // to implement the additional constraints
             LOGGER.info("Key exchange guess was correct: {}", guessedKex);
         } else {

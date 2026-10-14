@@ -7,7 +7,6 @@
  */
 package de.rub.nds.sshattacker.core.util;
 
-import de.rub.nds.modifiablevariable.util.ArrayConverter;
 import de.rub.nds.modifiablevariable.util.DataConverter;
 import de.rub.nds.sshattacker.core.config.Config;
 import de.rub.nds.sshattacker.core.state.SshContext;
@@ -50,8 +49,7 @@ public final class KeylogFile {
      */
     public static void writeKeylog(SshContext context) {
         Config config = context.getConfig();
-        if (!config.getWriteKeylogFile()
-                || config.getKeylogFilePath() == null) {
+        if (!config.getWriteKeylogFile() || config.getKeylogFilePath() == null) {
             return;
         }
         Optional<byte[]> sharedSecret = context.getSharedSecret();
@@ -60,8 +58,12 @@ public final class KeylogFile {
             return;
         }
         StringBuilder keylogLines = new StringBuilder();
-        context.getClientCookie().ifPresent(cookie -> keylogLines.append(buildKeylogLine(cookie, sharedSecret.get())));
-        context.getServerCookie().ifPresent(cookie -> keylogLines.append(buildKeylogLine(cookie, sharedSecret.get())));
+        context.getClientCookie()
+                .ifPresent(
+                        cookie -> keylogLines.append(buildKeylogLine(cookie, sharedSecret.get())));
+        context.getServerCookie()
+                .ifPresent(
+                        cookie -> keylogLines.append(buildKeylogLine(cookie, sharedSecret.get())));
         if (keylogLines.isEmpty()) {
             LOGGER.debug("Not writing keylog entry, no KEXINIT cookie is available");
             return;
@@ -81,9 +83,9 @@ public final class KeylogFile {
     }
 
     private static String buildKeylogLine(byte[] cookie, byte[] secretHex) {
-        return DataConverter.bytesToRawHexString(cookie) +
-                " SHARED_SECRET " +
-                DataConverter.bytesToHexString(secretHex) +
-                '\n';
+        return DataConverter.bytesToRawHexString(cookie)
+                + " SHARED_SECRET "
+                + DataConverter.bytesToRawHexString(secretHex)
+                + '\n';
     }
 }
