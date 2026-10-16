@@ -7,9 +7,11 @@
  */
 package de.rub.nds.sshattacker.core.protocol.connection.preparator;
 
+import de.rub.nds.sshattacker.core.constants.ChannelState;
 import de.rub.nds.sshattacker.core.constants.MessageIdConstant;
 import de.rub.nds.sshattacker.core.protocol.common.SshMessagePreparator;
 import de.rub.nds.sshattacker.core.protocol.connection.Channel;
+import de.rub.nds.sshattacker.core.protocol.connection.ChannelManager;
 import de.rub.nds.sshattacker.core.protocol.connection.message.ChannelMessage;
 import de.rub.nds.sshattacker.core.workflow.chooser.Chooser;
 import java.util.Optional;
@@ -34,38 +36,53 @@ public abstract class ChannelMessagePreparator<T extends ChannelMessage<T>>
     }
 
     private void prepareChannel() {
-        Optional<Integer> configSenderChannelId =
-                Optional.ofNullable(getObject().getConfigSenderChannelId());
-        channel =
-                configSenderChannelId
-                        .flatMap(
-                                senderChannelId ->
-                                        Optional.ofNullable(
-                                                chooser.getContext()
-                                                        .getChannels()
-                                                        .get(senderChannelId)))
-                        .or(
-                                () ->
-                                        chooser.getContext()
-                                                .getChannelManager()
-                                                .guessChannelByReceivedMessages())
-                        .orElseGet(
-                                () -> {
-                                    LOGGER.warn(
-                                            "About to prepare channel message, but no corresponding was channel found or guessed. Creating a new one from defaults.");
-                                    Integer remoteChannelId = configSenderChannelId.orElse(0);
-                                    return chooser.getContext()
-                                            .getChannelManager()
-                                            .createNewChannelFromDefaults(remoteChannelId);
-                                });
+        ChannelManager channelManager = chooser.getContext().getChannelManager();
+        Integer configSenderChannelId = getObject().getConfigSenderChannelId();
+        if (configSenderChannelId != null) {
+            channel = channelManager.getChannels().get(configSenderChannelId);
+            if (channel == null) {
+                LOGGER.warn(
+                        "About to prepare channel message for channel with local id {}, but no such channel exists. Creating a new one from defaults with this id as local and remote id.",
+                        configSenderChannelId);
+                channel =
+                        channelManager.createNewChannelFromDefaults(
+                                configSenderChannelId, configSenderChannelId);
+            }
+        } else {
+            channel =
+                    guessChannel()
+                            .orElseGet(
+                                    () -> {
+                                        LOGGER.warn(
+                                                "About to prepare channel message, but no channel was found or guessed. Creating a new one from defaults.");
+                                        return channelManager.createNewChannelFromDefaults(0);
+                                    });
+        }
 
-        if (!channel.isOpen().getValue()) {
+        if (!isExpectedState(channel.getState())) {
             int localChannelId = channel.getLocalChannelId().getValue();
             LOGGER.warn(
-                    "About to prepare channel message for channel with local id {}, but channel is not open. Continuing anyway.",
-                    localChannelId);
+                    "About to prepare channel message for channel with local id {}, but channel is in state {}. Continuing anyway.",
+                    localChannelId,
+                    channel.getState());
         }
         getObject().setRecipientChannelId(channel.getRemoteChannelId());
+    }
+
+    /**
+     * Guesses the channel of a message that does not name one explicitly.
+     *
+     * @return The guessed channel, or empty to create a new one from the defaults
+     */
+    protected Optional<Channel> guessChannel() {
+        return chooser.getContext().getChannelManager().guessChannel();
+    }
+
+    /**
+     * @return Whether the message may be sent on a channel in the given state without a warning
+     */
+    protected boolean isExpectedState(ChannelState state) {
+        return state == ChannelState.OPEN;
     }
 
     protected abstract void prepareChannelMessageSpecificContents();

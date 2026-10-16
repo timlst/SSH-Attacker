@@ -7,6 +7,7 @@
  */
 package de.rub.nds.sshattacker.core.protocol.connection.handler;
 
+import de.rub.nds.sshattacker.core.constants.ChannelState;
 import de.rub.nds.sshattacker.core.protocol.common.*;
 import de.rub.nds.sshattacker.core.protocol.connection.Channel;
 import de.rub.nds.sshattacker.core.protocol.connection.message.ChannelCloseMessage;
@@ -33,14 +34,16 @@ public class ChannelCloseMessageHandler extends SshMessageHandler<ChannelCloseMe
     public void adjustContext() {
         Channel channel = context.getChannels().get(message.getRecipientChannelId().getValue());
         if (channel != null) {
-            if (!channel.isOpen().getValue()) {
+            if (channel.getState() != ChannelState.OPEN
+                    && channel.getState() != ChannelState.CLOSE_SENT) {
                 LOGGER.warn(
-                        "{} received but channel with id {} is not open, continuing anyway.",
+                        "{} received but channel with id {} is in state {}, ignoring it.",
                         getClass().getSimpleName(),
-                        message.getRecipientChannelId().getValue());
+                        message.getRecipientChannelId().getValue(),
+                        channel.getState());
             } else {
-                channel.setCloseMessageReceived(true);
-                if (!channel.isOpen().getValue()) {
+                channel.closeReceived();
+                if (channel.getState() == ChannelState.CLOSED) {
                     context.getChannels().remove(message.getRecipientChannelId().getValue());
                 }
             }

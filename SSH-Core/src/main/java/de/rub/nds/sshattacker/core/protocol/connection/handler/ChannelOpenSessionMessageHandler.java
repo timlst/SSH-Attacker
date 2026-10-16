@@ -25,7 +25,7 @@ public class ChannelOpenSessionMessageHandler extends SshMessageHandler<ChannelO
 
     @Override
     public void adjustContext() {
-        // TODO: Handle ChannelOpenSessionMessage
+        context.getChannelManager().handleChannelOpenMessage(message);
     }
 
     @Override

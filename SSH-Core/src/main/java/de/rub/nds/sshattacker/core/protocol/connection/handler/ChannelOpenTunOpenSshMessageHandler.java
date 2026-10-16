@@ -28,7 +28,7 @@ public class ChannelOpenTunOpenSshMessageHandler
 
     @Override
     public void adjustContext() {
-        // TODO: Handle ChannelOpenTunOpenSshMessage
+        context.getChannelManager().handleChannelOpenMessage(message);
     }
 
     @Override

@@ -113,8 +113,7 @@ public class CyclicParserSerializerTest {
                         context.getConfig().getChannelDefaults().newChannelFromDefaults();
                 context.getChannelManager()
                         .getChannels()
-                        .put(defaultChannel.getRemoteChannelId().getValue(), defaultChannel);
-                defaultChannel.setOpen(true);
+                        .put(defaultChannel.getLocalChannelId().getValue(), defaultChannel);
             }
             // Prepare the message given the fresh context
             try {

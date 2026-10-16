@@ -7,6 +7,7 @@
  */
 package de.rub.nds.sshattacker.core.protocol.connection.handler;
 
+import de.rub.nds.sshattacker.core.constants.ChannelState;
 import de.rub.nds.sshattacker.core.protocol.common.*;
 import de.rub.nds.sshattacker.core.protocol.connection.Channel;
 import de.rub.nds.sshattacker.core.protocol.connection.message.ChannelOpenConfirmationMessage;
@@ -42,12 +43,18 @@ public class ChannelOpenConfirmationMessageHandler
             channel = context.getConfig().getChannelDefaults().newChannelFromDefaults();
             channel.setLocalChannelId(message.getRecipientChannelId().getValue());
             context.getChannels().put(channel.getLocalChannelId().getValue(), channel);
+        } else if (channel.getState() != ChannelState.OPEN_SENT) {
+            LOGGER.warn(
+                    "{} received but channel with id {} is in state {}, accepting it anyway.",
+                    getClass().getSimpleName(),
+                    message.getRecipientChannelId().getValue(),
+                    channel.getState());
         }
 
         channel.setRemoteChannelId(message.getSenderChannelId());
         channel.setRemotePacketSize(message.getMaximumPacketSize());
         channel.setRemoteWindowSize(message.getInitialWindowSize());
-        channel.setOpen(true);
+        channel.setState(ChannelState.OPEN);
     }
 
     @Override

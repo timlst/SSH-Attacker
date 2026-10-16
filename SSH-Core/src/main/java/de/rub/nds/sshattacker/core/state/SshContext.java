@@ -31,8 +31,8 @@ import de.rub.nds.tlsattacker.transport.ConnectionEndType;
 import de.rub.nds.tlsattacker.transport.TransportHandler;
 import de.rub.nds.tlsattacker.transport.TransportHandlerFactory;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public class SshContext {
@@ -1176,7 +1176,7 @@ public class SshContext {
     // endregion
 
     // region for Connection Protocol Fields
-    public HashMap<Integer, Channel> getChannels() {
+    public Map<Integer, Channel> getChannels() {
         return channelManager.getChannels();
     }
 

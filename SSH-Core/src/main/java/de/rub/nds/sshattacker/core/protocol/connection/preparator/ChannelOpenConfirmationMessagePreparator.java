@@ -7,11 +7,14 @@
  */
 package de.rub.nds.sshattacker.core.protocol.connection.preparator;
 
+import de.rub.nds.sshattacker.core.constants.ChannelState;
 import de.rub.nds.sshattacker.core.constants.MessageIdConstant;
 import de.rub.nds.sshattacker.core.protocol.common.SshMessagePreparator;
 import de.rub.nds.sshattacker.core.protocol.connection.Channel;
+import de.rub.nds.sshattacker.core.protocol.connection.ChannelManager;
 import de.rub.nds.sshattacker.core.protocol.connection.message.ChannelOpenConfirmationMessage;
 import de.rub.nds.sshattacker.core.workflow.chooser.Chooser;
+import java.util.Optional;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -27,33 +30,36 @@ public class ChannelOpenConfirmationMessagePreparator
 
     @Override
     public void prepareMessageSpecificContents() {
-        ChannelOpenConfirmationMessage toCopy =
-                chooser.getContext().getChannelManager().prepareNextOpenConfirm();
-        getObject().setRecipientChannelId(toCopy.getRecipientChannelId());
-        getObject().setSenderChannelId(toCopy.getSenderChannelId());
-
-        // get the closed Channel
-        Channel channel =
-                chooser.getContext()
-                        .getChannelManager()
-                        .getChannels()
-                        .get(toCopy.getRecipientChannelId().getValue());
-
-        if (channel != null) {
-            if (channel.isOpen().getValue()) {
-                LOGGER.warn(
-                        "Channel with id {} is already open, sending ChannelOpenConfirmationMessage with current channel details again.",
-                        channel.getLocalChannelId().getValue());
-            } else {
-                channel.setOpen(true);
-            }
+        ChannelManager channelManager = chooser.getContext().getChannelManager();
+        Optional<Channel> guessedChannel =
+                Optional.ofNullable(getObject().getConfigSenderChannelId())
+                        .map(channelManager.getChannels()::get)
+                        .or(channelManager::nextUnansweredIncomingOpen)
+                        .or(channelManager::guessChannel);
+        if (guessedChannel.isEmpty()) {
+            LOGGER.error("Failed to guess channel, setting sender and receiver channel IDs to 0!");
+            getObject().setSenderChannelId(0);
+            getObject().setRecipientChannelId(0);
+            getObject()
+                    .setInitialWindowSize(
+                            chooser.getConfig().getChannelDefaults().getLocalWindowSize());
+            getObject()
+                    .setMaximumPacketSize(
+                            chooser.getConfig().getChannelDefaults().getLocalPacketSize());
+            return;
         }
 
-        getObject()
-                .setInitialWindowSize(
-                        chooser.getConfig().getChannelDefaults().getLocalWindowSize());
-        getObject()
-                .setMaximumPacketSize(
-                        chooser.getConfig().getChannelDefaults().getLocalPacketSize());
+        Channel channel = guessedChannel.get();
+        if (channel.getState() != ChannelState.OPEN_RECEIVED) {
+            LOGGER.warn(
+                    "Channel with id {} is in state {}, sending ChannelOpenConfirmationMessage anyway.",
+                    channel.getLocalChannelId().getValue(),
+                    channel.getState());
+        }
+        channel.setState(ChannelState.OPEN);
+        getObject().setSenderChannelId(channel.getLocalChannelId().getValue());
+        getObject().setRecipientChannelId(channel.getRemoteChannelId().getValue());
+        getObject().setInitialWindowSize(channel.getLocalWindowSize().getValue());
+        getObject().setMaximumPacketSize(channel.getLocalPacketSize().getValue());
     }
 }

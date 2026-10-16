@@ -7,6 +7,7 @@
  */
 package de.rub.nds.sshattacker.core.protocol.connection.preparator;
 
+import de.rub.nds.sshattacker.core.constants.ChannelState;
 import de.rub.nds.sshattacker.core.constants.MessageIdConstant;
 import de.rub.nds.sshattacker.core.protocol.connection.message.ChannelCloseMessage;
 import de.rub.nds.sshattacker.core.workflow.chooser.Chooser;
@@ -18,9 +19,14 @@ public class ChannelCloseMessagePreparator extends ChannelMessagePreparator<Chan
     }
 
     @Override
+    protected boolean isExpectedState(ChannelState state) {
+        return state == ChannelState.OPEN || state == ChannelState.CLOSE_RECEIVED;
+    }
+
+    @Override
     protected void prepareChannelMessageSpecificContents() {
-        channel.setCloseMessageSent(true);
-        if (!channel.isOpen().getValue()) {
+        channel.closeSent();
+        if (channel.getState() == ChannelState.CLOSED) {
             chooser.getContext().getChannels().remove(channel.getLocalChannelId().getValue());
         }
     }

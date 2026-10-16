@@ -7,13 +7,14 @@
  */
 package de.rub.nds.sshattacker.core.protocol.connection.preparator;
 
+import de.rub.nds.sshattacker.core.constants.ChannelState;
 import de.rub.nds.sshattacker.core.constants.MessageIdConstant;
 import de.rub.nds.sshattacker.core.protocol.common.SshMessagePreparator;
 import de.rub.nds.sshattacker.core.protocol.connection.Channel;
 import de.rub.nds.sshattacker.core.protocol.connection.ChannelDefaults;
 import de.rub.nds.sshattacker.core.protocol.connection.message.ChannelOpenMessage;
 import de.rub.nds.sshattacker.core.workflow.chooser.Chooser;
-import java.util.HashMap;
+import java.util.Map;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -28,14 +29,14 @@ public abstract class ChannelOpenMessagePreparator<T extends ChannelOpenMessage<
 
     @Override
     public void prepareMessageSpecificContents() {
-        HashMap<Integer, Channel> channelMap = chooser.getContext().getChannels();
+        Map<Integer, Channel> channelMap = chooser.getContext().getChannels();
         ChannelDefaults channelDefaults = chooser.getConfig().getChannelDefaults();
 
         int channelId;
         if (getObject().getConfigSenderChannelId() != null) {
             channelId = getObject().getConfigSenderChannelId();
         } else {
-            channelId = channelDefaults.getLocalChannelId();
+            channelId = chooser.getContext().getChannelManager().findUnusedChannelId();
         }
         getObject().setSenderChannelId(channelId);
         Channel channel =
@@ -44,7 +45,7 @@ public abstract class ChannelOpenMessagePreparator<T extends ChannelOpenMessage<
             LOGGER.warn(
                     "Channel with id {} is already exists, reusing the existing channel object.",
                     getObject().getSenderChannelId().getValue());
-            if (channel.isOpen().getValue()) {
+            if (channel.isOpen()) {
                 LOGGER.warn(
                         "Channel with id {} is already open, sending ChannelOpenMessage with current channel details again.",
                         getObject().getSenderChannelId().getValue());
@@ -52,9 +53,13 @@ public abstract class ChannelOpenMessagePreparator<T extends ChannelOpenMessage<
         } else {
             channel = channelDefaults.newChannelFromDefaults();
             channel.setLocalChannelId(getObject().getSenderChannelId().getValue());
+            channel.setState(ChannelState.OPEN_SENT);
             channelMap.put(getObject().getSenderChannelId().getValue(), channel);
         }
-        getObject().setChannelType(channel.getChannelType(), true);
+        // Channels the peer opened with a type we do not know have none
+        if (channel.getChannelType() != null) {
+            getObject().setChannelType(channel.getChannelType(), true);
+        }
         getObject().setInitialWindowSize(channel.getLocalWindowSize());
         getObject().setMaximumPacketSize(32768);
         prepareChannelOpenMessageSpecificContents();

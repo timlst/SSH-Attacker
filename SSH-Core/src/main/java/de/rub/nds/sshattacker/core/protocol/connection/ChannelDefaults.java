@@ -83,7 +83,6 @@ public class ChannelDefaults implements Serializable {
                 localPacketSize,
                 remoteChannelId,
                 remoteWindowSize,
-                remotePacketSize,
-                false);
+                remotePacketSize);
     }
 }

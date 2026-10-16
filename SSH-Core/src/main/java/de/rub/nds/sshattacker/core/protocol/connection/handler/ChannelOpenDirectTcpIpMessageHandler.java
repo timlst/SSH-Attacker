@@ -28,7 +28,7 @@ public class ChannelOpenDirectTcpIpMessageHandler
 
     @Override
     public void adjustContext() {
-        // TODO: Handle ChannelOpenDirectTcpIpMessage
+        context.getChannelManager().handleChannelOpenMessage(message);
     }
 
     @Override

@@ -31,11 +31,12 @@ public class ChannelWindowAdjustMessageHandler
     public void adjustContext() {
         Channel channel = context.getChannels().get(message.getRecipientChannelId().getValue());
         if (channel != null) {
-            if (!channel.isOpen().getValue()) {
+            if (!channel.isOpen()) {
                 LOGGER.warn(
-                        "{} received but channel with id {} is not open, continuing anyway.",
+                        "{} received but channel with id {} is in state {}, continuing anyway.",
                         getClass().getSimpleName(),
-                        message.getRecipientChannelId().getValue());
+                        message.getRecipientChannelId().getValue(),
+                        channel.getState());
             }
             channel.setRemoteWindowSize(
                     channel.getLocalWindowSize().getValue() + message.getBytesToAdd().getValue());
@@ -45,6 +46,7 @@ public class ChannelWindowAdjustMessageHandler
                     getClass().getSimpleName(),
                     message.getRecipientChannelId().getValue());
             channel = context.getConfig().getChannelDefaults().newChannelFromDefaults();
+            channel.setLocalChannelId(message.getRecipientChannelId().getValue());
             context.getChannels().put(channel.getLocalChannelId().getValue(), channel);
         }
     }

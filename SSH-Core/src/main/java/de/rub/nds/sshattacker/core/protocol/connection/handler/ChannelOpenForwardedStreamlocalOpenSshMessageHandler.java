@@ -28,7 +28,7 @@ public class ChannelOpenForwardedStreamlocalOpenSshMessageHandler
 
     @Override
     public void adjustContext() {
-        // TODO: Handle ChannelOpenForwardedStreamlocalOpenSshMessage
+        context.getChannelManager().handleChannelOpenMessage(message);
     }
 
     @Override

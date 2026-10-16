@@ -8,8 +8,8 @@
 package de.rub.nds.sshattacker.core.protocol.connection;
 
 import de.rub.nds.modifiablevariable.ModifiableVariableFactory;
-import de.rub.nds.modifiablevariable.bool.ModifiableBoolean;
 import de.rub.nds.modifiablevariable.integer.ModifiableInteger;
+import de.rub.nds.sshattacker.core.constants.ChannelState;
 import de.rub.nds.sshattacker.core.constants.ChannelType;
 import java.io.Serializable;
 
@@ -24,9 +24,11 @@ public class Channel implements Serializable {
     private ModifiableInteger remoteWindowSize;
     private ModifiableInteger remotePacketSize;
 
-    private ModifiableBoolean open;
-    private ModifiableBoolean closeMessageReceived;
-    private ModifiableBoolean closeMessageSent;
+    /**
+     * Channels created from the defaults are assumed to be established. The open handshake sets
+     * {@link ChannelState#OPEN_SENT} or {@link ChannelState#OPEN_RECEIVED} explicitly.
+     */
+    private ChannelState state = ChannelState.OPEN;
 
     public Channel() {
         super();
@@ -36,32 +38,24 @@ public class Channel implements Serializable {
             ChannelType channelType,
             Integer localChannelId,
             Integer localWindowSize,
-            Integer localPacketSize,
-            boolean open) {
+            Integer localPacketSize) {
         super();
         this.channelType = channelType;
         setLocalChannelId(localChannelId);
         setLocalWindowSize(localWindowSize);
         setLocalPacketSize(localPacketSize);
-        setCloseMessageSent(false);
-        setCloseMessageReceived(false);
-        setOpen(open);
     }
 
     public Channel(
             ChannelType channelType,
             ModifiableInteger localChannelId,
             ModifiableInteger localWindowSize,
-            ModifiableInteger localPacketSize,
-            Boolean open) {
+            ModifiableInteger localPacketSize) {
         super();
         this.channelType = channelType;
         this.localChannelId = localChannelId;
         this.localWindowSize = localWindowSize;
         this.localPacketSize = localPacketSize;
-        setCloseMessageSent(false);
-        setCloseMessageReceived(false);
-        setOpen(open);
     }
 
     public Channel(
@@ -71,8 +65,7 @@ public class Channel implements Serializable {
             Integer localPacketSize,
             Integer remoteChannelId,
             Integer remoteWindowSize,
-            Integer remotePacketSize,
-            Boolean open) {
+            Integer remotePacketSize) {
         super();
         this.channelType = channelType;
         setLocalChannelId(localChannelId);
@@ -81,9 +74,6 @@ public class Channel implements Serializable {
         setRemoteChannelId(remoteChannelId);
         setRemoteWindowSize(remoteWindowSize);
         setRemotePacketSize(remotePacketSize);
-        setCloseMessageSent(false);
-        setCloseMessageReceived(false);
-        setOpen(open);
     }
 
     public ChannelType getChannelType() {
@@ -107,56 +97,35 @@ public class Channel implements Serializable {
                 ModifiableVariableFactory.safelySetValue(this.localPacketSize, localPacketSize);
     }
 
-    @SuppressWarnings("NonBooleanMethodNameMayNotStartWithQuestion")
-    public ModifiableBoolean isOpen() {
-        return open;
+    public ChannelState getState() {
+        return state;
     }
 
-    public void setOpen(ModifiableBoolean open) {
-        this.open = open;
+    public void setState(ChannelState state) {
+        this.state = state;
     }
 
-    public void setOpen(Boolean open) {
-        this.open = ModifiableVariableFactory.safelySetValue(this.open, open);
+    /**
+     * @return Whether the open was confirmed and no side sent SSH_MSG_CHANNEL_CLOSE yet
+     */
+    public boolean isOpen() {
+        return state == ChannelState.OPEN;
     }
 
-    public ModifiableBoolean getCloseMessageReceived() {
-        return closeMessageReceived;
+    /** Records that we sent SSH_MSG_CHANNEL_CLOSE. */
+    public void closeSent() {
+        state =
+                state == ChannelState.CLOSE_RECEIVED
+                        ? ChannelState.CLOSED
+                        : ChannelState.CLOSE_SENT;
     }
 
-    public void setCloseMessageReceived(ModifiableBoolean closeMessageReceived) {
-        this.closeMessageReceived = closeMessageReceived;
-        if (closeMessageSent.getValue() && this.closeMessageReceived.getValue()) {
-            setOpen(false);
-        }
-    }
-
-    public void setCloseMessageReceived(boolean closeMessageReceived) {
-        this.closeMessageReceived =
-                ModifiableVariableFactory.safelySetValue(
-                        this.closeMessageReceived, closeMessageReceived);
-        if (closeMessageSent.getValue() && this.closeMessageReceived.getValue()) {
-            setOpen(false);
-        }
-    }
-
-    public ModifiableBoolean getCloseMessageSent() {
-        return closeMessageSent;
-    }
-
-    public void setCloseMessageSent(ModifiableBoolean closeMessageSent) {
-        this.closeMessageSent = closeMessageSent;
-        if (this.closeMessageSent.getValue() && closeMessageReceived.getValue()) {
-            setOpen(false);
-        }
-    }
-
-    public void setCloseMessageSent(boolean closeMessageSent) {
-        this.closeMessageSent =
-                ModifiableVariableFactory.safelySetValue(this.closeMessageSent, closeMessageSent);
-        if (this.closeMessageSent.getValue() && closeMessageReceived.getValue()) {
-            setOpen(false);
-        }
+    /** Records that the peer sent SSH_MSG_CHANNEL_CLOSE. */
+    public void closeReceived() {
+        state =
+                state == ChannelState.CLOSE_SENT
+                        ? ChannelState.CLOSED
+                        : ChannelState.CLOSE_RECEIVED;
     }
 
     public ModifiableInteger getLocalWindowSize() {
@@ -230,7 +199,7 @@ public class Channel implements Serializable {
                 + "Channel{"
                 + "\n"
                 + " channelType: "
-                + channelType.toString()
+                + channelType
                 + "\n"
                 + " localChannelId: "
                 + localChannelId.getValue()
@@ -250,14 +219,8 @@ public class Channel implements Serializable {
                 + " remotePacketSize: "
                 + remotePacketSize.getValue()
                 + "\n"
-                + " open:"
-                + open.getValue()
-                + "\n"
-                + " closeMessageSent: "
-                + closeMessageSent.getValue()
-                + "\n"
-                + " closeMessageReceived: "
-                + closeMessageReceived.getValue()
+                + " state: "
+                + state
                 + "\n"
                 + '}';
     }

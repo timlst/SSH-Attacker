@@ -26,7 +26,7 @@ public class ChannelOpenX11MessageHandler extends SshMessageHandler<ChannelOpenX
 
     @Override
     public void adjustContext() {
-        // TODO: Handle ChannelOpenX11Message
+        context.getChannelManager().handleChannelOpenMessage(message);
     }
 
     @Override

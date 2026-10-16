@@ -28,7 +28,7 @@ public class ChannelOpenForwardedTcpIpMessageHandler
 
     @Override
     public void adjustContext() {
-        // TODO: Handle ChannelOpenForwardedTcpIpMessage
+        context.getChannelManager().handleChannelOpenMessage(message);
     }
 
     @Override

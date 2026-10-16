@@ -28,7 +28,7 @@ public class ChannelOpenDirectStreamlocalOpenSshMessageHandler
 
     @Override
     public void adjustContext() {
-        // TODO: Handle ChannelOpenDirectStreamlocalOpenSshMessage
+        context.getChannelManager().handleChannelOpenMessage(message);
     }
 
     @Override
