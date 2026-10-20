@@ -36,7 +36,7 @@ public class ChannelOpenFailureMessageHandler extends SshMessageHandler<ChannelO
                     getClass().getSimpleName(),
                     message.getRecipientChannelId().getValue());
         }
-        context.getChannels().remove(message.getRecipientChannelId().getValue());
+        context.getChannelManager().removeChannel(message.getRecipientChannelId().getValue());
     }
 
     @Override

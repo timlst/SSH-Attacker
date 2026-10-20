@@ -38,7 +38,7 @@ public class ChannelOpenFailureMessagePreparator
     public void prepareChannelMessageSpecificContents() {
         // A rejected channel never existed, so its local id is free again
         if (channel.getState() == ChannelState.OPEN_RECEIVED) {
-            chooser.getContext().getChannels().remove(channel.getLocalChannelId().getValue());
+            chooser.getContext().getChannelManager().removeChannel(channel);
         }
         // TODO dummy values for fuzzing
         getObject().setReasonCode(Integer.MAX_VALUE);

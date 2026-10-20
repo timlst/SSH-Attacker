@@ -44,7 +44,8 @@ public class ChannelCloseMessageHandler extends SshMessageHandler<ChannelCloseMe
             } else {
                 channel.closeReceived();
                 if (channel.getState() == ChannelState.CLOSED) {
-                    context.getChannels().remove(message.getRecipientChannelId().getValue());
+                    context.getChannelManager()
+                            .removeChannel(message.getRecipientChannelId().getValue());
                 }
             }
         } else {

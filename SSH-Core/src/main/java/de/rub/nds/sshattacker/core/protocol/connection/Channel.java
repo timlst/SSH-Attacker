@@ -114,6 +114,9 @@ public class Channel implements Serializable {
 
     /** Records that we sent SSH_MSG_CHANNEL_CLOSE. */
     public void closeSent() {
+        if (state == ChannelState.CLOSED) {
+            return;
+        }
         state =
                 state == ChannelState.CLOSE_RECEIVED
                         ? ChannelState.CLOSED
@@ -122,6 +125,9 @@ public class Channel implements Serializable {
 
     /** Records that the peer sent SSH_MSG_CHANNEL_CLOSE. */
     public void closeReceived() {
+        if (state == ChannelState.CLOSED) {
+            return;
+        }
         state =
                 state == ChannelState.CLOSE_SENT
                         ? ChannelState.CLOSED

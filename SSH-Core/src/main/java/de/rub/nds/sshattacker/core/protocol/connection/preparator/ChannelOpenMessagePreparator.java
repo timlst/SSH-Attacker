@@ -14,7 +14,6 @@ import de.rub.nds.sshattacker.core.protocol.connection.Channel;
 import de.rub.nds.sshattacker.core.protocol.connection.ChannelDefaults;
 import de.rub.nds.sshattacker.core.protocol.connection.message.ChannelOpenMessage;
 import de.rub.nds.sshattacker.core.workflow.chooser.Chooser;
-import java.util.Map;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -29,7 +28,6 @@ public abstract class ChannelOpenMessagePreparator<T extends ChannelOpenMessage<
 
     @Override
     public void prepareMessageSpecificContents() {
-        Map<Integer, Channel> channelMap = chooser.getContext().getChannels();
         ChannelDefaults channelDefaults = chooser.getConfig().getChannelDefaults();
 
         int channelId;
@@ -54,8 +52,9 @@ public abstract class ChannelOpenMessagePreparator<T extends ChannelOpenMessage<
             channel = channelDefaults.newChannelFromDefaults();
             channel.setLocalChannelId(getObject().getSenderChannelId().getValue());
             channel.setState(ChannelState.OPEN_SENT);
-            channelMap.put(getObject().getSenderChannelId().getValue(), channel);
         }
+        // Opening a channel selects it, also when re-opening an existing one
+        chooser.getContext().getChannelManager().addChannel(channel);
         // Channels the peer opened with a type we do not know have none
         if (channel.getChannelType() != null) {
             getObject().setChannelType(channel.getChannelType(), true);

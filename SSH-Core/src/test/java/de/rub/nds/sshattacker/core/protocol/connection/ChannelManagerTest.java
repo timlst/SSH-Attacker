@@ -223,94 +223,142 @@ public class ChannelManagerTest {
 
     /** Opens a channel from our side and has the peer confirm it with the given remote id. */
     private static void openAndConfirm(SshContext ctx, int remoteId) {
+        int localId = ctx.getChannelManager().findUnusedChannelId(); // the id the open will take
         send(ctx, new ChannelOpenSessionMessage());
         ChannelOpenConfirmationMessage conf = new ChannelOpenConfirmationMessage();
-        conf.setRecipientChannelId(ctx.getChannelManager().findUnusedChannelId() - 1);
+        conf.setRecipientChannelId(localId);
         conf.setSenderChannelId(remoteId);
         conf.setInitialWindowSize(100);
         conf.setMaximumPacketSize(200);
         receive(ctx, conf);
     }
 
-    @Test
-    public void selectionTargetsTheChosenChannel() {
-        SshContext ctx = new SshContext();
-        openAndConfirm(ctx, 50); // local 0, peer 50
-        openAndConfirm(ctx, 51); // local 1, peer 51
-
-        // Default (no selection): most recently opened channel.
+    /** Sends data without naming a channel and returns the peer id it went to. */
+    private static int dataTarget(SshContext ctx) {
         ChannelDataMessage d = new ChannelDataMessage();
         send(ctx, d);
-        assertEquals(51, d.getRecipientChannelId().getValue());
+        return d.getRecipientChannelId().getValue();
+    }
 
-        ctx.getChannelManager().selectFirstChannel();
-        d = new ChannelDataMessage();
-        send(ctx, d);
-        assertEquals(50, d.getRecipientChannelId().getValue(), "first -> channel 0 (peer 50)");
-
-        ctx.getChannelManager().selectNextChannel();
-        d = new ChannelDataMessage();
-        send(ctx, d);
-        assertEquals(51, d.getRecipientChannelId().getValue(), "next -> channel 1 (peer 51)");
-
-        ctx.getChannelManager().selectNextChannel(); // wraps
-        d = new ChannelDataMessage();
-        send(ctx, d);
-        assertEquals(50, d.getRecipientChannelId().getValue(), "next wraps -> channel 0");
-
-        ctx.getChannelManager().selectPreviousChannel(); // wraps back
-        d = new ChannelDataMessage();
-        send(ctx, d);
-        assertEquals(51, d.getRecipientChannelId().getValue(), "prev wraps -> channel 1");
+    /** Closes a channel from both sides, so it is removed. */
+    private static void closeFully(SshContext ctx, int localId) {
+        ChannelCloseMessage ours = new ChannelCloseMessage();
+        ours.setConfigSenderChannelId(localId);
+        send(ctx, ours);
+        ChannelCloseMessage theirs = new ChannelCloseMessage();
+        theirs.setRecipientChannelId(localId);
+        receive(ctx, theirs);
     }
 
     @Test
-    public void selectionSurvivesAndFallsBackAfterClose() {
+    public void openingAChannelSelectsIt() {
         SshContext ctx = new SshContext();
         openAndConfirm(ctx, 50); // local 0
         openAndConfirm(ctx, 51); // local 1
-        ctx.getChannelManager().selectFirstChannel(); // channel 0
+        assertEquals(51, dataTarget(ctx));
+    }
 
-        // Close channel 0 fully, removing it; selection is now stale.
-        ChannelCloseMessage ourClose = new ChannelCloseMessage();
-        ourClose.setConfigSenderChannelId(0);
-        send(ctx, ourClose);
-        ChannelCloseMessage peerClose = new ChannelCloseMessage();
-        peerClose.setRecipientChannelId(0);
-        receive(ctx, peerClose);
+    @Test
+    public void registeringAPeerChannelSelectsIt() {
+        SshContext ctx = new SshContext();
+        openAndConfirm(ctx, 50); // local 0
+        receive(ctx, peerOpen(new ChannelOpenX11Message(), 70, "x11")); // local 1
+        send(ctx, new ChannelOpenConfirmationMessage());
+        assertEquals(70, dataTarget(ctx));
+    }
+
+    @Test
+    public void selectTargetsTheChosenChannel() {
+        SshContext ctx = new SshContext();
+        openAndConfirm(ctx, 50); // local 0
+        openAndConfirm(ctx, 51); // local 1
+        ctx.getChannelManager().select(ctx.getChannels().get(0));
+        assertEquals(50, dataTarget(ctx));
+    }
+
+    @Test
+    public void removingTheSelectedChannelSelectsTheMostRecentRemaining() {
+        SshContext ctx = new SshContext();
+        openAndConfirm(ctx, 50); // local 0
+        openAndConfirm(ctx, 51); // local 1
+        openAndConfirm(ctx, 52); // local 2
+        ctx.getChannelManager().select(ctx.getChannels().get(0));
+        closeFully(ctx, 0);
         assertNull(ctx.getChannels().get(0));
+        assertEquals(52, dataTarget(ctx), "most recently added remaining, not the next in order");
+    }
 
-        // Stale selection: next picks the first remaining channel.
-        ctx.getChannelManager().selectNextChannel();
-        ChannelDataMessage d = new ChannelDataMessage();
-        send(ctx, d);
-        assertEquals(51, d.getRecipientChannelId().getValue());
+    @Test
+    public void removingAnotherChannelKeepsTheSelection() {
+        SshContext ctx = new SshContext();
+        openAndConfirm(ctx, 50); // local 0
+        openAndConfirm(ctx, 51); // local 1
+        ctx.getChannelManager().select(ctx.getChannels().get(0));
+        closeFully(ctx, 1);
+        assertEquals(50, dataTarget(ctx));
+    }
+
+    @Test
+    public void aRemovedChannelCanStillBeSelected() {
+        SshContext ctx = new SshContext();
+        openAndConfirm(ctx, 50); // local 0
+        openAndConfirm(ctx, 51); // local 1
+        Channel dead = ctx.getChannels().get(1);
+        closeFully(ctx, 1);
+        ctx.getChannelManager().select(dead);
+        assertEquals(51, dataTarget(ctx), "sent on the dead channel");
+        assertEquals(1, ctx.getChannels().size());
+    }
+
+    @Test
+    public void closingARemovedChannelLeavesANewChannelWithItsIdAlone() {
+        SshContext ctx = new SshContext();
+        openAndConfirm(ctx, 50); // local 0
+        openAndConfirm(ctx, 51); // local 1
+        Channel dead = ctx.getChannels().get(1);
+        closeFully(ctx, 1);
+        openAndConfirm(ctx, 52); // reuses local 1
+        ctx.getChannelManager().select(dead);
+        ChannelCloseMessage close = new ChannelCloseMessage();
+        send(ctx, close);
+        assertEquals(51, close.getRecipientChannelId().getValue());
+        assertEquals(52, ctx.getChannels().get(1).getRemoteChannelId().getValue());
+        assertEquals(ChannelState.OPEN, ctx.getChannels().get(1).getState());
     }
 
     @Test
     public void requestCanTargetAMismatchedChannelType() {
         SshContext ctx = new SshContext();
-        openAndConfirm(ctx, 50); // a session channel, local 0, peer 50
-        // The peer opens an x11 channel towards us; we confirm it (local 1).
-        ChannelOpenX11Message x11 = new ChannelOpenX11Message();
-        x11.setSenderChannelId(60);
-        x11.setChannelType("x11", true);
-        x11.setInitialWindowSize(1000);
-        x11.setMaximumPacketSize(2000);
-        receive(ctx, x11);
-        send(ctx, new ChannelOpenConfirmationMessage()); // confirms the x11 channel (local 1)
-
-        // Select the x11 channel and send an exec request onto it (mismatched type).
-        ctx.getChannelManager()
-                .selectNextChannel(); // from the x11 open: lands on local 0 or 1 depending on
-        // anchor
-        ctx.getChannelManager().selectFirstChannel();
-        ctx.getChannelManager().selectNextChannel(); // -> local 1, the x11 channel
+        openAndConfirm(ctx, 50); // a session channel, local 0
+        receive(ctx, peerOpen(new ChannelOpenX11Message(), 60, "x11")); // local 1
+        send(ctx, new ChannelOpenConfirmationMessage());
+        ctx.getChannelManager().select(ctx.getChannels().get(1));
         ChannelRequestExecMessage exec = new ChannelRequestExecMessage();
         send(ctx, exec);
-        assertEquals(
-                60,
-                exec.getRecipientChannelId().getValue(),
-                "exec directed at the x11 channel's peer id");
+        assertEquals(60, exec.getRecipientChannelId().getValue());
+    }
+
+    @Test
+    public void confirmingGoesThroughTheManager() {
+        java.util.List<Channel> confirmed = new java.util.ArrayList<>();
+        SshContext ctx = new SshContext();
+        ctx.setChannelManager(
+                new ChannelManager(ctx) {
+                    @Override
+                    public void confirmChannel(Channel channel) {
+                        super.confirmChannel(channel);
+                        confirmed.add(channel);
+                    }
+                });
+        receive(ctx, peerOpen(new ChannelOpenSessionMessage(), 7, "session"));
+        send(ctx, new ChannelOpenConfirmationMessage());
+        assertEquals(1, confirmed.size());
+        assertEquals(ChannelState.OPEN, confirmed.get(0).getState());
+    }
+
+    @Test
+    public void channelsCanOnlyChangeThroughTheManager() {
+        SshContext ctx = new SshContext();
+        assertThrows(UnsupportedOperationException.class, () -> ctx.getChannels().remove(0));
     }
 }

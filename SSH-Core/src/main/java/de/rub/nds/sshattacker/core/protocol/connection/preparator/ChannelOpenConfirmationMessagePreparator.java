@@ -56,7 +56,7 @@ public class ChannelOpenConfirmationMessagePreparator
                     channel.getLocalChannelId().getValue(),
                     channel.getState());
         }
-        channel.setState(ChannelState.OPEN);
+        channelManager.confirmChannel(channel);
         getObject().setSenderChannelId(channel.getLocalChannelId().getValue());
         getObject().setRecipientChannelId(channel.getRemoteChannelId().getValue());
         getObject().setInitialWindowSize(channel.getLocalWindowSize().getValue());

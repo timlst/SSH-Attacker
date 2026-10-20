@@ -36,6 +36,7 @@ public class WorkflowConfigurationFactory {
     public WorkflowConfigurationFactory(Config config) {
         super();
         this.config = config;
+        this.mode = config.getDefaultRunningMode();
     }
 
     public WorkflowTrace createWorkflowTrace(

@@ -47,7 +47,7 @@ public class ChannelWindowAdjustMessageHandler
                     message.getRecipientChannelId().getValue());
             channel = context.getConfig().getChannelDefaults().newChannelFromDefaults();
             channel.setLocalChannelId(message.getRecipientChannelId().getValue());
-            context.getChannels().put(channel.getLocalChannelId().getValue(), channel);
+            context.getChannelManager().addChannel(channel);
         }
     }
 

@@ -42,7 +42,7 @@ public class ChannelOpenConfirmationMessageHandler
                     message.getRecipientChannelId().getValue());
             channel = context.getConfig().getChannelDefaults().newChannelFromDefaults();
             channel.setLocalChannelId(message.getRecipientChannelId().getValue());
-            context.getChannels().put(channel.getLocalChannelId().getValue(), channel);
+            context.getChannelManager().addChannel(channel);
         } else if (channel.getState() != ChannelState.OPEN_SENT) {
             LOGGER.warn(
                     "{} received but channel with id {} is in state {}, accepting it anyway.",
@@ -55,6 +55,7 @@ public class ChannelOpenConfirmationMessageHandler
         channel.setRemotePacketSize(message.getMaximumPacketSize());
         channel.setRemoteWindowSize(message.getInitialWindowSize());
         channel.setState(ChannelState.OPEN);
+        context.getChannelManager().confirmedByPeer(channel);
     }
 
     @Override

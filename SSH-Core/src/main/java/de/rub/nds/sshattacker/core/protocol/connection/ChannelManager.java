@@ -24,6 +24,12 @@ import org.apache.logging.log4j.Logger;
  * channel by our id, and every message we send takes the peer's id from the channel. Whether an
  * open is still pending is recorded in the channel's {@link ChannelState}. The map keeps the order
  * in which channels were added, so the peer's opens are answered oldest first.
+ *
+ * <p>Outgoing channel messages that name no channel go to the selected one. By default, adding a
+ * channel (ours or the peer's) selects it, and removing the selected channel selects the most
+ * recently added remaining one. Channels only change through {@link #addChannel}, {@link
+ * #removeChannel} and {@link #confirmChannel}, so subclasses can implement a different policy by
+ * overriding those together with {@link #guessChannel} and {@link #takeChannelAwaitingReply}.
  */
 public class ChannelManager {
 
@@ -41,58 +47,59 @@ public class ChannelManager {
     /** Local ids of the channels with a peer request that wants a reply, oldest first. */
     private final Deque<Integer> channelsAwaitingReply = new ArrayDeque<>();
 
-    /**
-     * Local id of the channel explicitly selected for outgoing messages that do not name one, or
-     * null to fall back to the most recently opened channel. Moved by the channel selection
-     * symbols.
-     */
-    private Integer selectedChannelId = null;
+    /** The channel messages that name none go to; null only while there are no channels. */
+    private Channel selected = null;
 
     public ChannelManager(SshContext context) {
         super();
         this.context = context;
     }
 
-    /** Selects the first channel in open order, if any. */
-    public void selectFirstChannel() {
-        Iterator<Integer> it = channels.keySet().iterator();
-        selectedChannelId = it.hasNext() ? it.next() : null;
-    }
-
-    /** Moves the selection to the next channel in open order, wrapping around. */
-    public void selectNextChannel() {
-        moveSelection(1);
-    }
-
-    /** Moves the selection to the previous channel in open order, wrapping around. */
-    public void selectPreviousChannel() {
-        moveSelection(-1);
-    }
-
-    private void moveSelection(int delta) {
-        List<Integer> ids = new ArrayList<>(channels.keySet());
-        if (ids.isEmpty()) {
-            selectedChannelId = null;
-            return;
-        }
-        int idx = selectedChannelId == null ? -1 : ids.indexOf(selectedChannelId);
-        if (idx < 0) {
-            // No (or stale) selection: next/first picks the first channel, previous the last.
-            selectedChannelId = delta >= 0 ? ids.get(0) : ids.get(ids.size() - 1);
-        } else {
-            selectedChannelId = ids.get(Math.floorMod(idx + delta, ids.size()));
-        }
-    }
-
-    private Channel selectedChannel() {
-        return selectedChannelId == null ? null : channels.get(selectedChannelId);
+    /**
+     * Selects the channel messages that name none go to. It need not be in the channel map, e.g. a
+     * channel that was removed already.
+     */
+    public void select(Channel channel) {
+        selected = channel;
     }
 
     /**
-     * @return The channels by their local id, in the order they were added
+     * @return The channels by their local id, in the order they were added; read-only, use {@link
+     *     #addChannel} and {@link #removeChannel} to change them
      */
     public Map<Integer, Channel> getChannels() {
-        return channels;
+        return Collections.unmodifiableMap(channels);
+    }
+
+    /** Adds a channel under its local id and selects it. */
+    public void addChannel(Channel channel) {
+        channels.put(channel.getLocalChannelId().getValue(), channel);
+        selected = channel;
+    }
+
+    /**
+     * Removes a channel, if present. If it was selected, the most recently added remaining channel
+     * is selected instead.
+     */
+    public void removeChannel(int localChannelId) {
+        Channel removed = channels.remove(localChannelId);
+        if (removed != null && selected == removed) {
+            selected = null;
+            for (Channel channel : channels.values()) {
+                selected = channel;
+            }
+        }
+    }
+
+    /**
+     * Removes the given channel if it is still the one in the map under its local id: a no-op for a
+     * channel that was removed already, whose local id a new channel may have taken over since.
+     */
+    public void removeChannel(Channel channel) {
+        int localChannelId = channel.getLocalChannelId().getValue();
+        if (channels.get(localChannelId) == channel) {
+            removeChannel(localChannelId);
+        }
     }
 
     /**
@@ -122,12 +129,27 @@ public class ChannelManager {
                     "Peer opened a channel with id {}, which it already uses for another channel. Tracking it as a separate channel anyway.",
                     remoteChannelId);
         }
-        Channel channel = createNewChannelFromDefaults(remoteChannelId);
+        // Complete before adding it, so that addChannel sees a pending peer open
+        Channel channel = context.getConfig().getChannelDefaults().newChannelFromDefaults();
+        channel.setLocalChannelId(findUnusedChannelId());
+        channel.setRemoteChannelId(remoteChannelId);
         channel.setChannelType(ChannelType.fromName(message.getChannelType().getValue()));
         channel.setRemoteWindowSize(message.getInitialWindowSize());
         channel.setRemotePacketSize(message.getMaximumPacketSize());
         channel.setState(ChannelState.OPEN_RECEIVED);
+        addChannel(channel);
     }
+
+    /** Records that we confirm a channel, usually one the peer opened. */
+    public void confirmChannel(Channel channel) {
+        channel.setState(ChannelState.OPEN);
+    }
+
+    /**
+     * Called after the peer confirmed a channel, usually one we opened: the peer's id for it is
+     * known from now on. Does nothing by default.
+     */
+    public void confirmedByPeer(Channel channel) {}
 
     /**
      * @return The oldest channel the peer opened that we neither confirmed nor rejected yet
@@ -139,23 +161,11 @@ public class ChannelManager {
     }
 
     /**
-     * Guesses the channel a message is meant for, if it does not name one: the most recently added
-     * open channel, or else the most recently added channel at all.
+     * @return The channel a message goes to if it does not name one: the selected channel, empty if
+     *     there is none
      */
     public Optional<Channel> guessChannel() {
-        Channel selected = selectedChannel();
-        if (selected != null) {
-            return Optional.of(selected);
-        }
-        Channel lastChannel = null;
-        Channel lastOpenChannel = null;
-        for (Channel channel : channels.values()) {
-            lastChannel = channel;
-            if (channel.isOpen()) {
-                lastOpenChannel = channel;
-            }
-        }
-        return Optional.ofNullable(lastOpenChannel != null ? lastOpenChannel : lastChannel);
+        return Optional.ofNullable(selected);
     }
 
     /** Records that the peer sent a channel request that wants a reply. */
@@ -198,7 +208,7 @@ public class ChannelManager {
         Channel channel = context.getConfig().getChannelDefaults().newChannelFromDefaults();
         channel.setLocalChannelId(localChannelId);
         channel.setRemoteChannelId(remoteChannelId);
-        channels.put(localChannelId, channel);
+        addChannel(channel);
         return channel;
     }
 
