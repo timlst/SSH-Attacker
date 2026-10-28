@@ -514,20 +514,6 @@ public class Config implements Serializable {
     /** The path to save the Config as file. */
     private String configOutput;
 
-    // region Keylog File
-    /**
-     * If set to true, the shared secret of every completed key exchange is appended to the keylog
-     * file in a format that can be used by Wireshark to decrypt SSH traffic. Wireshark's SSH
-     * decryption is still work in progress and does not support all algorithms, see {@link
-     * de.rub.nds.sshattacker.core.util.KeylogFile}.
-     */
-    private Boolean writeKeylogFile = false;
-
-    /** The path of the Wireshark-compatible keylog file. */
-    private String keylogFilePath = "/tmp/keyfile.log";
-
-    // endregion
-
     /** Fallback for type of chooser, to initialize the chooser in the SshContext */
     private ChooserType chooserType = ChooserType.DEFAULT;
 
@@ -1924,25 +1910,6 @@ public class Config implements Serializable {
 
     public void setStopTraceAfterUnexpected(Boolean stopTraceAfterUnexpected) {
         this.stopTraceAfterUnexpected = stopTraceAfterUnexpected;
-    }
-
-    // endregion
-
-    // region Getters / Setters for Keylog File
-    public Boolean getWriteKeylogFile() {
-        return writeKeylogFile;
-    }
-
-    public void setWriteKeylogFile(Boolean writeKeylogFile) {
-        this.writeKeylogFile = writeKeylogFile;
-    }
-
-    public String getKeylogFilePath() {
-        return keylogFilePath;
-    }
-
-    public void setKeylogFilePath(String keylogFilePath) {
-        this.keylogFilePath = keylogFilePath;
     }
 
     // endregion
