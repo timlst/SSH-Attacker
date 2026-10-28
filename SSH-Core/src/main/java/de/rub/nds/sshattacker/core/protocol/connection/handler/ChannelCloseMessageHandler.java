@@ -36,6 +36,7 @@ public class ChannelCloseMessageHandler extends SshMessageHandler<ChannelCloseMe
         if (channel != null) {
             if (channel.getState() != ChannelState.OPEN
                     && channel.getState() != ChannelState.CLOSE_SENT) {
+                // we did not consider the channel alive, when we received peer closing it
                 LOGGER.warn(
                         "{} received but channel with id {} is in state {}, ignoring it.",
                         getClass().getSimpleName(),

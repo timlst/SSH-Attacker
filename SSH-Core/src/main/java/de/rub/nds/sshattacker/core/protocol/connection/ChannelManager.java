@@ -9,8 +9,10 @@ package de.rub.nds.sshattacker.core.protocol.connection;
 
 import de.rub.nds.sshattacker.core.constants.ChannelState;
 import de.rub.nds.sshattacker.core.constants.ChannelType;
+import de.rub.nds.sshattacker.core.protocol.connection.message.ChannelFailureMessage;
 import de.rub.nds.sshattacker.core.protocol.connection.message.ChannelMessage;
 import de.rub.nds.sshattacker.core.protocol.connection.message.ChannelOpenMessage;
+import de.rub.nds.sshattacker.core.protocol.connection.message.ChannelSuccessMessage;
 import de.rub.nds.sshattacker.core.state.SshContext;
 import java.util.*;
 import java.util.stream.IntStream;
@@ -20,16 +22,11 @@ import org.apache.logging.log4j.Logger;
 /**
  * Keeps track of the channels of a connection, both the ones we open and the ones the peer opens.
  *
- * <p>Channels are stored by their local id only: every channel message the peer sends names the
- * channel by our id, and every message we send takes the peer's id from the channel. Whether an
- * open is still pending is recorded in the channel's {@link ChannelState}. The map keeps the order
- * in which channels were added, so the peer's opens are answered oldest first.
+ *<p>Channels are stored in a map by their local id, accessible via {@link #getChannels}.
+ * Each channel maintains its lifecycle in the {@link ChannelState} enum.
+ * The ChannelManager separately tracks a fallback channel for cases in which sent messages do not reference a channel.
  *
- * <p>Outgoing channel messages that name no channel go to the selected one. By default, adding a
- * channel (ours or the peer's) selects it, and removing the selected channel selects the most
- * recently added remaining one. Channels only change through {@link #addChannel}, {@link
- * #removeChannel} and {@link #confirmChannel}, so subclasses can implement a different policy by
- * overriding those together with {@link #guessChannel} and {@link #takeChannelAwaitingReply}.
+ * It also keeps track of unanswered channel requests, which replaces the fallback channel for messages like {@link ChannelSuccessMessage} and {@link ChannelFailureMessage} that are replies to a peer request.
  */
 public class ChannelManager {
 
@@ -48,7 +45,7 @@ public class ChannelManager {
     private final Deque<Integer> channelsAwaitingReply = new ArrayDeque<>();
 
     /** The channel messages that name none go to; null only while there are no channels. */
-    private Channel selected = null;
+    private Channel fallbackGuess = null;
 
     public ChannelManager(SshContext context) {
         super();
@@ -60,7 +57,7 @@ public class ChannelManager {
      * channel that was removed already.
      */
     public void select(Channel channel) {
-        selected = channel;
+        fallbackGuess = channel;
     }
 
     /**
@@ -74,7 +71,7 @@ public class ChannelManager {
     /** Adds a channel under its local id and selects it. */
     public void addChannel(Channel channel) {
         channels.put(channel.getLocalChannelId().getValue(), channel);
-        selected = channel;
+        fallbackGuess = channel;
     }
 
     /**
@@ -83,10 +80,10 @@ public class ChannelManager {
      */
     public void removeChannel(int localChannelId) {
         Channel removed = channels.remove(localChannelId);
-        if (removed != null && selected == removed) {
-            selected = null;
+        if (removed != null && fallbackGuess == removed) {
+            fallbackGuess = null;
             for (Channel channel : channels.values()) {
-                selected = channel;
+                fallbackGuess = channel;
             }
         }
     }
@@ -165,7 +162,7 @@ public class ChannelManager {
      *     there is none
      */
     public Optional<Channel> guessChannel() {
-        return Optional.ofNullable(selected);
+        return Optional.ofNullable(fallbackGuess);
     }
 
     /** Records that the peer sent a channel request that wants a reply. */

@@ -36,6 +36,7 @@ public class ChannelOpenConfirmationMessageHandler
     public void adjustContext() {
         Channel channel = context.getChannels().get(message.getRecipientChannelId().getValue());
         if (channel == null) {
+            // peer confirms a channel, we don't remember requesting/don't know about
             LOGGER.warn(
                     "{} received but no channel with id {} found locally, creating a new channel from defaults with given channel id.",
                     getClass().getSimpleName(),
@@ -44,6 +45,7 @@ public class ChannelOpenConfirmationMessageHandler
             channel.setLocalChannelId(message.getRecipientChannelId().getValue());
             context.getChannelManager().addChannel(channel);
         } else if (channel.getState() != ChannelState.OPEN_SENT) {
+            // peer confirms a channel we know, but which we already considered active
             LOGGER.warn(
                     "{} received but channel with id {} is in state {}, accepting it anyway.",
                     getClass().getSimpleName(),
